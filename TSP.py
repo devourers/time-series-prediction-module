@@ -14,8 +14,30 @@ precalc_f = precalc_dir_name + precalc_file
 
 with open(precalc_f) as js:
     data = json.load(js)
+
+#data[0] = 1 
+axis_x = np.arange(1, len(data)+1, 1)
+axis_x_2 = np.arange(2, len(data)+2, 1)
+
     
-    
+def MA(time_series):
+    res = 0
+    for i in range (len(time_series)):
+        res += time_series[i]
+    res /= len(time_series)
+    return res
+
+#MA
+final_sample = []
+for i in range(len(data)-1):
+    test = MA(data[0:i+1])
+    final_sample.append(test)
+final_sample.append(MA(data))
+plt.scatter(axis_x, data, label="Data")
+plt.scatter(axis_x_2, final_sample, label = "Predictions MA")
+plt.legend()
+plt.show()   
+
 def SES(time_series, smoothing_coeficient):
     s = np.zeros(len(time_series)+1)
     s[0] = time_series[0]
@@ -24,9 +46,8 @@ def SES(time_series, smoothing_coeficient):
     s[len(time_series)] = s[len(time_series)-1] + smoothing_coeficient * (time_series[-1] - s[len(time_series)-1])
     return s
 
-axis_x = np.arange(1, len(data)+1, 1)
 
-SES
+#SES
 final_sample = []
 for i in range(len(data)-1):
     test = SES(data[0:i+1], 0.9)
@@ -34,9 +55,8 @@ for i in range(len(data)-1):
 
 final_sample.append(SES(data, 0.9)[-1])
 
-plt.scatter(axis_x[6:], data[6:], label="Data")
-print(len(final_sample))
-plt.scatter(axis_x[6:], final_sample[6:], label = "Predictions")
+plt.scatter(axis_x, data, label="Data")
+plt.scatter(axis_x_2, final_sample, label = "Predictions SES")
 plt.legend()
 plt.show()
 
@@ -64,7 +84,7 @@ def LSM_AR(time_series):
     x = np.linalg.solve(a, b)
     return x
 
-LSM_AR
+#LSM_AR
 final_sample = []
 for i in range(len(data)-1):
     test = LSM_AR(data[0:i+1])
@@ -72,9 +92,8 @@ for i in range(len(data)-1):
 fin_elem = LSM_AR(data)
 final_sample.append(fin_elem[0] + (axis_x[-1]+1) * test[1])
 
-plt.scatter(axis_x[5:], data[5:], label="Data")
-print(len(final_sample))
-plt.scatter(axis_x[5:], final_sample[5:], label = "Predictions")
+plt.scatter(axis_x, data, label="Data")
+plt.scatter(axis_x_2, final_sample, label = "Predictions LSM_AR")
 plt.legend()
 plt.show()
 
@@ -89,7 +108,7 @@ def LSM_SQR(time_series):
     b = frac_top/frac_bottom
     return b
 
-LSM_SQR
+#LSM_SQR
 final_sample = []
 for i in range(len(data)-1):
     test = LSM_SQR(data[0:i+1])
@@ -97,9 +116,8 @@ for i in range(len(data)-1):
 
 final_sample.append(LSM_SQR(data) * (axis_x[-1]+1 * axis_x[-1]+1))
 
-plt.scatter(axis_x[5:], data[5:], label="Data")
-print(len(final_sample))
-plt.scatter(axis_x[5:], final_sample[5:], label = "Predictions")
+plt.scatter(axis_x, data, label="Data")
+plt.scatter(axis_x_2, final_sample, label = "Predictions LSM_SQR")
 plt.legend()
 plt.show()
 
@@ -110,9 +128,8 @@ final_sample = [0]
 for i in range(len(data)-1):
     final_sample.append(data[i])
 
-plt.scatter(axis_x[2:], data[2:], label="Data")
-print(len(final_sample))
-plt.scatter(axis_x[2:], final_sample[2:], label = "Predictions")
+plt.scatter(axis_x, data, label="Data")
+plt.scatter(axis_x, final_sample, label = "Predictions Martingale")
 
 plt.legend()
 plt.show()
