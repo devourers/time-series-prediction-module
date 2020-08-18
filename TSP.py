@@ -4,8 +4,10 @@ import pandas as pd
 import json
 import os
 import random
+from statsmodels.tsa.holtwinters import SimpleExpSmoothing
 
-precalc_dir_name = "./precalc_distance_summation_midv500/"
+
+precalc_dir_name = "./precalc_distance_summation_midv2019/"
 precalc_dir = os.listdir(precalc_dir_name)
 precalc_file = random.choice(precalc_dir)
 #precalc_file = "./precalc_distance_summation_midv500/date_CA01_field05_summation_precalc_dists.json"
@@ -19,20 +21,27 @@ with open(precalc_f) as js:
 axis_x = np.arange(1, len(data)+1, 1)
 axis_x_2 = np.arange(2, len(data)+2, 1)
 
+
     
-def MA(time_series):
+def MA(time_series, window):
     res = 0
-    for i in range (len(time_series)):
-        res += time_series[i]
-    res /= len(time_series)
+    if window > len(time_series):
+        window = len(time_series)
+        window_l = time_series[-1*window:]
+    else:
+        window_l = time_series[-1*window:]
+    for i in range (len(window_l)):
+        res += window_l[i]
+    res /= window
     return res
+    
 
 #MA
 final_sample = []
 for i in range(len(data)-1):
-    test = MA(data[0:i+1])
+    test = MA(data[0:i+1], 2)
     final_sample.append(test)
-final_sample.append(MA(data))
+final_sample.append(MA(data, 2))
 plt.scatter(axis_x, data, label="Data")
 plt.scatter(axis_x_2, final_sample, label = "Predictions MA")
 plt.legend()
@@ -50,18 +59,30 @@ def SES(time_series, smoothing_coeficient):
 #SES
 final_sample = []
 for i in range(len(data)-1):
-    test = SES(data[0:i+1], 0.9)
+    test = SES(data[0:i+1], 0.6)
     final_sample.append(test[-1])
 
 final_sample.append(SES(data, 0.9)[-1])
 
+
+y = [0]
+model = SimpleExpSmoothing(data)
+model_fit = model.fit()
+# make prediction
+for i in range(1, len(data)):
+    yhat = model_fit.predict(i, i)
+    y.append(yhat)
 plt.scatter(axis_x, data, label="Data")
+plt.scatter(axis_x_2, y, label = "SES statsmodel")
 plt.scatter(axis_x_2, final_sample, label = "Predictions SES")
 plt.legend()
 plt.show()
 
     
-def LSM_AR(time_series):
+def LSM_AR(time_series, window):
+    if window > len(time_series):
+        window = len(time_series)
+    time_series = time_series[-1 * window:]
     x = np.arange(1, len(time_series)+1, 1)
     a_11 = 2*len(time_series)
     a_12 = 0
@@ -87,9 +108,9 @@ def LSM_AR(time_series):
 #LSM_AR
 final_sample = []
 for i in range(len(data)-1):
-    test = LSM_AR(data[0:i+1])
+    test = LSM_AR(data[0:i+1], 10)
     final_sample.append(test[0] + axis_x[i+1] * test[1])
-fin_elem = LSM_AR(data)
+fin_elem = LSM_AR(data, 10)
 final_sample.append(fin_elem[0] + (axis_x[-1]+1) * test[1])
 
 plt.scatter(axis_x, data, label="Data")
@@ -133,6 +154,70 @@ plt.scatter(axis_x, final_sample, label = "Predictions Martingale")
 
 plt.legend()
 plt.show()
+
+def F(a, b, c, x, y):
+    res = 0
+    for i in range(len(x)):
+        res += (a * np.exp(b*x[i]) + c - y[i])**2
+    return res
+
+def trenar_search(f, lin_k, c, x, y, left, right, eps):
+    if right - left < eps:
+        return (left+right)/2
+    a = (left * 2 + right)/3
+    b = (left + right * 2)/3
+    if f(lin_k, a, c, x, y) < f(lin_k, b, c, x, y):
+        return trenar_search(f, lin_k, c, x, y, left, b, eps)
+    else:
+        return trenar_search(f, lin_k, c, x, y, a, right, eps)    
+    
+def LSM_exp(time_series, window):
+    if window > len(time_series):
+        window = len(time_series)
+    time_series = time_series[-1*window:]
+    x = np.arange(1, len(time_series)+1, 1)
+    x_old = x
+    x = np.exp(x)
+    a_11 = 2*len(time_series)
+    a_12 = 0
+    a_21 = 0
+    a_22 = 0
+    b_1 = 0
+    b_2 = 0    
+    for i in range(len(x)):
+        a_12 += x[i]
+        a_21 += x[i]
+        a_22 += x[i] * x[i]
+        b_1 += time_series[i]
+        b_2 += time_series[i] * x[i]        
+    a_12 *= 2
+    a_22 *= 2
+    b_1 *= 2
+    b_2 *= 2
+    a = np.array([[a_11, a_12], [a_21, a_22]])
+    b = np.array([b_1, b_2])
+    lin_sol = np.linalg.solve(a, b)
+    B_fin = trenar_search(F, lin_sol[1], lin_sol[0], x_old, time_series, -100, 100, 0.00001)
+    return lin_sol[1] * np.exp(B_fin * (x_old[-1] + 1)) + lin_sol[0]
+
+
+plt.scatter(axis_x, data, label="Data")
+
+fin_sample = []
+for i in range(len(data) - 1):
+    test = LSM_exp(data[0:i+1], 10)
+    fin_sample.append(test)
+fin_sample.append(LSM_exp(data, 10))
+print(fin_sample)
+plt.scatter(axis_x_2, fin_sample, label = "Predction LSM Exponential")
+plt.legend()
+plt.show()
+
+
+
+
+
+
 '''
 TEST FOR LSM_SQR
 
