@@ -64,16 +64,7 @@ for i in range(len(data)-1):
 
 final_sample.append(SES(data, 0.9)[-1])
 
-
-y = [0]
-model = SimpleExpSmoothing(data)
-model_fit = model.fit()
-# make prediction
-for i in range(1, len(data)):
-    yhat = model_fit.predict(i, i)
-    y.append(yhat)
 plt.scatter(axis_x, data, label="Data")
-plt.scatter(axis_x_2, y, label = "SES statsmodel")
 plt.scatter(axis_x_2, final_sample, label = "Predictions SES")
 plt.legend()
 plt.show()
@@ -170,7 +161,10 @@ def trenar_search(f, lin_k, c, x, y, left, right, eps):
         return trenar_search(f, lin_k, c, x, y, left, b, eps)
     else:
         return trenar_search(f, lin_k, c, x, y, a, right, eps)    
-    
+
+
+#LSM exponential
+
 def LSM_exp(time_series, window):
     if window > len(time_series):
         window = len(time_series)
@@ -197,7 +191,7 @@ def LSM_exp(time_series, window):
     a = np.array([[a_11, a_12], [a_21, a_22]])
     b = np.array([b_1, b_2])
     lin_sol = np.linalg.solve(a, b)
-    B_fin = trenar_search(F, lin_sol[1], lin_sol[0], x_old, time_series, -100, 100, 0.00001)
+    B_fin = trenar_search(F, lin_sol[1], lin_sol[0], x_old, time_series, -10, 10, 0.00001)
     return lin_sol[1] * np.exp(B_fin * (x_old[-1] + 1)) + lin_sol[0]
 
 
@@ -213,7 +207,55 @@ plt.scatter(axis_x_2, fin_sample, label = "Predction LSM Exponential")
 plt.legend()
 plt.show()
 
+#LSM hyperbolic
 
+def G(a, b, c, x, y):
+    res = 0
+    for i in range(len(x)):
+        res += (a* (1/(x[i] +b)) + c - y[i])**2
+    return res
+
+def LSM_hprbl(time_series, window):
+    if window > len(time_series):
+        window = len(time_series)
+    time_series = time_series[-1*window:]
+    x = np.arange(1, len(time_series)+1, 1)
+    x_old = x
+    x = 1 / x    
+    a_11 = 2*len(time_series)
+    a_12 = 0
+    a_21 = 0
+    a_22 = 0
+    b_1 = 0
+    b_2 = 0    
+    for i in range(len(x)):
+        a_12 += x[i]
+        a_21 += x[i]
+        a_22 += x[i] * x[i]
+        b_1 += time_series[i]
+        b_2 += time_series[i] * x[i]        
+    a_12 *= 2
+    a_22 *= 2
+    b_1 *= 2
+    b_2 *= 2
+    a = np.array([[a_11, a_12], [a_21, a_22]])
+    b = np.array([b_1, b_2])
+    lin_sol = np.linalg.solve(a, b)
+    B_fin = trenar_search(G, lin_sol[1], lin_sol[0], x_old, time_series, -10, 10, 0.00001)
+    return lin_sol[1] * (1/(x_old[-1] + 1 + B_fin)) + lin_sol[0] 
+
+
+plt.scatter(axis_x, data, label="Data")
+
+fin_sample = []
+for i in range(len(data) - 1):
+    test = LSM_hprbl(data[0:i+1], 10)
+    fin_sample.append(test)
+fin_sample.append(LSM_hprbl(data, 10))
+print(fin_sample)
+plt.scatter(axis_x_2, fin_sample, label = "Predction LSM Hyperbolic")
+plt.legend()
+plt.show()
 
 
 
