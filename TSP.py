@@ -4,22 +4,23 @@ import pandas as pd
 import json
 import os
 import random
+import math
 from statsmodels.tsa.holtwinters import SimpleExpSmoothing
 
 
 precalc_dir_name = "./precalc_distance_summation_midv2019/"
 precalc_dir = os.listdir(precalc_dir_name)
 precalc_file = random.choice(precalc_dir)
-#precalc_file = "./precalc_distance_summation_midv500/date_CA01_field05_summation_precalc_dists.json"
 print(precalc_file)
 precalc_f = precalc_dir_name + precalc_file
 
 with open(precalc_f) as js:
     data = json.load(js)
 
-#data[0] = 1 
-axis_x = np.arange(1, len(data)+1, 1)
-axis_x_2 = np.arange(2, len(data)+2, 1)
+axis_x = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30]
+axis_x_2 = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31]
+#axis_x = np.arange(1, len(data)+1, 1)
+#axis_x_2 = np.arange(2, len(data)+2, 1)
 
 
     
@@ -148,74 +149,57 @@ plt.show()
 
 #LSM exponential
 
+def lin_LSE(x, y, coef):
+    x_e = []
+    for i in range(len(x)):
+        x_e.append(math.e**(x[i] * coef))
+    sum_x = 0
+    sum_x2 = 0
+    sum_y = 0
+    sum_xy = 0
+    for i in range(len(x_e)):
+        sum_x += x_e[i]
+        sum_x2 += x_e[i]**2
+        sum_y += y[i]
+        sum_xy += x_e[i] * y[i]
+    det = sum_x2 * len(x_e) - sum_x * sum_x
+    det_1 =  -1 * (sum_x * sum_y - sum_xy * len(x_e))
+    det_2 = sum_x2 * sum_y - sum_xy * sum_x
+    return [det_1/det, det_2/det]
+
+
 def F(a, b, c, x, y):
     res = 0
     for i in range(len(x)):
-        res += (a * np.exp(b*x[i]) + c - y[i])**2
+        res += (a * math.e**(b*x[i]) + c - y[i])**2
     return res
 
-def trenar_search_exp(f, lin_k, c, x, y, left, right, eps):
-    while abs(right-left) > eps:
-        a = (left * 2 + right)/3
-        b = (left + right * 2)/3
-        if f(lin_k, a, c, x, y) < f(lin_k, b, c, x, y):
-            #calculate linear and free coeficients for F
-            x_e = np.exp(a*x)
-            a_11 = 2*len(y)
-            a_12 = 0
-            a_21 = 0
-            a_22 = 0
-            b_1 = 0
-            b_2 = 0    
-            for i in range(len(x)):
-                a_12 += x_e[i]
-                a_21 += x_e[i]
-                a_22 += x_e[i] * x_e[i]
-                b_1 += y[i]
-                b_2 += y[i] * x_e[i]        
-            a_12 *= 2
-            a_22 *= 2
-            b_1 *= 2
-            b_2 *= 2
-            A = np.array([[a_11, a_12], [a_21, a_22]])
-            B = np.array([b_1, b_2])
-            lin_sol = np.linalg.solve(A, B)
-            lin_k = lin_sol[1]
-            c = lin_sol[0]
-            left = a
+def trenar_search_exp(f, x, y, x_L, x_R):
+    eps = 1e-6
+    left_ = x_L
+    right_ = x_R
+    while right_ > left_+eps:
+        t = (right_ - left_)/3
+        a = left_ + t
+        b = right_ - t
+        a_coefs = lin_LSE(x, y, a)
+        b_coefs = lin_LSE(x, y, b)
+        if f(a_coefs[0], a, a_coefs[1], x, y) < f(b_coefs[0], b, b_coefs[1], x, y):
+            right_ = b
         else:
-            #calculate linear and free coeficients for F
-            x_e = np.exp(b*x)
-            a_11 = 2*len(y)
-            a_12 = 0
-            a_21 = 0
-            a_22 = 0
-            b_1 = 0
-            b_2 = 0    
-            for i in range(len(x)):
-                a_12 += x_e[i]
-                a_21 += x_e[i]
-                a_22 += x_e[i] * x_e[i]
-                b_1 += y[i]
-                b_2 += y[i] * x_e[i]        
-            a_12 *= 2
-            a_22 *= 2
-            b_1 *= 2
-            b_2 *= 2
-            A = np.array([[a_11, a_12], [a_21, a_22]])
-            B = np.array([b_1, b_2])
-            lin_sol = np.linalg.solve(A, B)
-            lin_k = lin_sol[1]
-            c = lin_sol[0]
-            right = b
-    return [(left+right)/2, lin_k, c]
+            left_ = a
+    fin_k, fin_c = lin_LSE(x, y, (left_+right_)/2) 
+    return [(left_+right_)/2, fin_k, fin_c]
     
 def LSM_exp(time_series, window):
     if window > len(time_series):
         window = len(time_series)    
     time_series = time_series[-1*window:]
-    x = np.arange(1, len(time_series)+1, 1)
-    fin_coefs = trenar_search_exp(F, 1, 1, x, time_series, -1, 1, 0.000000001)
+    x = []
+    for i in range(len(time_series)):
+        x.append(i+1)
+    #x = np.arange(1, len(time_series)+1, 1)
+    fin_coefs = trenar_search_exp(F, x, time_series, -10, 10)
     #return fin_coefs[1] * (np.exp(fin_coefs[0] * (x[-1]+1))) + fin_coefs[2]
     return fin_coefs
     
@@ -233,12 +217,16 @@ plt.legend()
 plt.show() 
 '''
     
-plt.scatter(axis_x, data, label="Data")
 
 
-a = LSM_exp(data, 30)
+data_ = [1, 0.46153846153846156, 0.2413073884407883, 0.10770967367013787, 0.07700750592137354, 0.05094869585348801, 0.03649031598765177, 0.03305359048477479, 0.06817662151845572, 0.023501736923423982, 0.04493310985928079, 0.042189709937925673, 0.020371837617953647, 0.023918397709030238, 0.028416117428578636, 0.016137991859223867, 0.021189357351962045, 0.01569411116843049, 0.01220096278892372, 0.013755405534419927, 0.010860387690834406, 0.020114855373696915, 0.010125973612102485, 0.01151475415192085, 0.018721230522486632, 0.02291392071377881, 0.007359811323309845, 0.006655482039178563, 0.0054911625657606145, 0.008595925853987073]
+sample = []
+plt.scatter(axis_x, data_, label="Data")
+#a = lin_LSE(axis_x, data_, 1)
+a = LSM_exp(data_, 30)
 print(a)
-sample = a[1] * np.exp(a[0] * axis_x_2) + a[2]
+for i in range(len(axis_x)):
+    sample.append(a[1] * math.e**(a[0] * axis_x[i]) + a[2])
 plt.plot(axis_x, sample, label = "Fit")
 plt.legend()
 plt.show() 
