@@ -146,179 +146,99 @@ plt.scatter(axis_x, final_sample, label = "Predictions Martingale")
 plt.legend()
 plt.show()
 
+#LSM exponential
+
 def F(a, b, c, x, y):
     res = 0
     for i in range(len(x)):
         res += (a * np.exp(b*x[i]) + c - y[i])**2
     return res
 
-def trenar_search(f, lin_k, c, x, y, left, right, eps):
-    if right - left < eps:
-        return (left+right)/2
-    a = (left * 2 + right)/3
-    b = (left + right * 2)/3
-    if f(lin_k, a, c, x, y) < f(lin_k, b, c, x, y):
-        return trenar_search(f, lin_k, c, x, y, left, b, eps)
-    else:
-        return trenar_search(f, lin_k, c, x, y, a, right, eps)    
-
-
-#LSM exponential
-
+def trenar_search_exp(f, lin_k, c, x, y, left, right, eps):
+    while abs(right-left) > eps:
+        a = (left * 2 + right)/3
+        b = (left + right * 2)/3
+        if f(lin_k, a, c, x, y) < f(lin_k, b, c, x, y):
+            #calculate linear and free coeficients for F
+            x_e = np.exp(a*x)
+            a_11 = 2*len(y)
+            a_12 = 0
+            a_21 = 0
+            a_22 = 0
+            b_1 = 0
+            b_2 = 0    
+            for i in range(len(x)):
+                a_12 += x_e[i]
+                a_21 += x_e[i]
+                a_22 += x_e[i] * x_e[i]
+                b_1 += y[i]
+                b_2 += y[i] * x_e[i]        
+            a_12 *= 2
+            a_22 *= 2
+            b_1 *= 2
+            b_2 *= 2
+            A = np.array([[a_11, a_12], [a_21, a_22]])
+            B = np.array([b_1, b_2])
+            lin_sol = np.linalg.solve(A, B)
+            lin_k = lin_sol[1]
+            c = lin_sol[0]
+            left = a
+        else:
+            #calculate linear and free coeficients for F
+            x_e = np.exp(b*x)
+            a_11 = 2*len(y)
+            a_12 = 0
+            a_21 = 0
+            a_22 = 0
+            b_1 = 0
+            b_2 = 0    
+            for i in range(len(x)):
+                a_12 += x_e[i]
+                a_21 += x_e[i]
+                a_22 += x_e[i] * x_e[i]
+                b_1 += y[i]
+                b_2 += y[i] * x_e[i]        
+            a_12 *= 2
+            a_22 *= 2
+            b_1 *= 2
+            b_2 *= 2
+            A = np.array([[a_11, a_12], [a_21, a_22]])
+            B = np.array([b_1, b_2])
+            lin_sol = np.linalg.solve(A, B)
+            lin_k = lin_sol[1]
+            c = lin_sol[0]
+            right = b
+    return [(left+right)/2, lin_k, c]
+    
 def LSM_exp(time_series, window):
     if window > len(time_series):
-        window = len(time_series)
+        window = len(time_series)    
     time_series = time_series[-1*window:]
     x = np.arange(1, len(time_series)+1, 1)
-    x_old = x
-    x = np.exp(x)
-    a_11 = 2*len(time_series)
-    a_12 = 0
-    a_21 = 0
-    a_22 = 0
-    b_1 = 0
-    b_2 = 0    
-    for i in range(len(x)):
-        a_12 += x[i]
-        a_21 += x[i]
-        a_22 += x[i] * x[i]
-        b_1 += time_series[i]
-        b_2 += time_series[i] * x[i]        
-    a_12 *= 2
-    a_22 *= 2
-    b_1 *= 2
-    b_2 *= 2
-    a = np.array([[a_11, a_12], [a_21, a_22]])
-    b = np.array([b_1, b_2])
-    lin_sol = np.linalg.solve(a, b)
-    B_fin = trenar_search(F, lin_sol[1], lin_sol[0], x_old, time_series, -10, 10, 0.00001)
-    return lin_sol[1] * np.exp(B_fin * (x_old[-1] + 1)) + lin_sol[0]
-
-
+    fin_coefs = trenar_search_exp(F, 1, 1, x, time_series, -1, 1, 0.000000001)
+    #return fin_coefs[1] * (np.exp(fin_coefs[0] * (x[-1]+1))) + fin_coefs[2]
+    return fin_coefs
+    
+'''    
 plt.scatter(axis_x, data, label="Data")
 
 fin_sample = []
 for i in range(len(data) - 1):
-    test = LSM_exp(data[0:i+1], 10)
+    test = LSM_exp(data[0:i+1], 5)
     fin_sample.append(test)
-fin_sample.append(LSM_exp(data, 10))
+fin_sample.append(LSM_exp(data, 5))
 print(fin_sample)
 plt.scatter(axis_x_2, fin_sample, label = "Predction LSM Exponential")
 plt.legend()
-plt.show()
-
-#LSM hyperbolic
-
-def G(a, b, c, x, y):
-    res = 0
-    for i in range(len(x)):
-        res += (a* (1/(x[i] +b)) + c - y[i])**2
-    return res
-
-def LSM_hprbl(time_series, window):
-    if window > len(time_series):
-        window = len(time_series)
-    time_series = time_series[-1*window:]
-    x = np.arange(1, len(time_series)+1, 1)
-    x_old = x
-    x = 1 / x    
-    a_11 = 2*len(time_series)
-    a_12 = 0
-    a_21 = 0
-    a_22 = 0
-    b_1 = 0
-    b_2 = 0    
-    for i in range(len(x)):
-        a_12 += x[i]
-        a_21 += x[i]
-        a_22 += x[i] * x[i]
-        b_1 += time_series[i]
-        b_2 += time_series[i] * x[i]        
-    a_12 *= 2
-    a_22 *= 2
-    b_1 *= 2
-    b_2 *= 2
-    a = np.array([[a_11, a_12], [a_21, a_22]])
-    b = np.array([b_1, b_2])
-    lin_sol = np.linalg.solve(a, b)
-    B_fin = trenar_search(G, lin_sol[1], lin_sol[0], x_old, time_series, -10, 10, 0.00001)
-    return lin_sol[1] * (1/(x_old[-1] + 1 + B_fin)) + lin_sol[0] 
-
-
+plt.show() 
+'''
+    
 plt.scatter(axis_x, data, label="Data")
 
-fin_sample = []
-for i in range(len(data) - 1):
-    test = LSM_hprbl(data[0:i+1], 10)
-    fin_sample.append(test)
-fin_sample.append(LSM_hprbl(data, 10))
-print(fin_sample)
-plt.scatter(axis_x_2, fin_sample, label = "Predction LSM Hyperbolic")
+
+a = LSM_exp(data, 30)
+print(a)
+sample = a[1] * np.exp(a[0] * axis_x_2) + a[2]
+plt.plot(axis_x, sample, label = "Fit")
 plt.legend()
-plt.show()
-
-
-
-
-'''
-TEST FOR LSM_SQR
-
-sample = np.random.random_sample((10,))
-
-axis_x = np.arange(1, len(data)+1, 1)
-
-def f(x, b):
-    return b * (x ** 2)
-
-test = LSM_SQR(data)
-y = f(axis_x, test)
-
-plt.scatter(axis_x, data, label = "data")
-plt.plot(axis_x, y, label = "fit")
-
-
-'''
-
-'''
-TESTS FOR SIMPLE EXPONENTIAL SMOOTHING
-sample = np.random.random_sample((30,))
-axis_x = np.arange(1, 31, 1)
-
-smoothing09 = SES(sample, 0.9)
-smoothing08 = SES(sample, 0.8)
-smoothing07 = SES(sample, 0.7)
-smoothing06 = SES(sample, 0.6)
-smoothing05 = SES(sample, 0.5)
-smoothing04 = SES(sample, 0.4)
-smoothing03 = SES(sample, 0.3)
-smoothing02 = SES(sample, 0.2)
-smoothing01 = SES(sample, 0.1)
-
-plt.plot(axis_x[0:100], sample, label = "original")
-plt.plot(axis_x, smoothing09, label = "a = 0.9")
-plt.plot(axis_x, smoothing08, label = "a = 0.8")
-plt.plot(axis_x, smoothing07, label = "a = 0.7")
-plt.plot(axis_x, smoothing06, label = "a = 0.6")
-plt.plot(axis_x, smoothing05, label = "a = 0.5")
-plt.plot(axis_x, smoothing04, label = "a = 0.4")
-plt.plot(axis_x, smoothing03, label = "a = 0.3")
-plt.plot(axis_x, smoothing02, label = "a = 0.2")
-plt.plot(axis_x, smoothing01, label = "a = 0.1")
-'''
-
-'''
-TESTS FOR LINEAR AUTOREGRESSION
-sample = np.random.random_sample((30,))
-axis_x = np.arange(1, 31, 1)
-
-plt.scatter(axis_x, sample, label = "data")
-testing_solution = LSM_AR(sample)
-def f(x, k, b):
-    return k*x + b
-
-y = f(axis_x, testing_solution[1], testing_solution[0])
-
-plt.plot(axis_x, y, label = "fit")
-'''
-
-
+plt.show() 
