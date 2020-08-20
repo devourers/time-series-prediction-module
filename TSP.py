@@ -150,6 +150,8 @@ plt.show()
 #LSM exponential
 
 def lin_LSE(x, y, coef):
+    if len(x) == 1:
+        return [0, y[0]]
     x_e = []
     for i in range(len(x)):
         x_e.append(math.e**(x[i] * coef))
@@ -200,33 +202,90 @@ def LSM_exp(time_series, window):
         x.append(i+1)
     #x = np.arange(1, len(time_series)+1, 1)
     fin_coefs = trenar_search_exp(F, x, time_series, -10, 10)
-    #return fin_coefs[1] * (np.exp(fin_coefs[0] * (x[-1]+1))) + fin_coefs[2]
-    return fin_coefs
-    
-'''    
-plt.scatter(axis_x, data, label="Data")
+    return fin_coefs[1] * math.e**(fin_coefs[0] * (x[-1]+1)) + fin_coefs[2]
+    #return fin_coefs
 
-fin_sample = []
-for i in range(len(data) - 1):
-    test = LSM_exp(data[0:i+1], 5)
-    fin_sample.append(test)
-fin_sample.append(LSM_exp(data, 5))
-print(fin_sample)
-plt.scatter(axis_x_2, fin_sample, label = "Predction LSM Exponential")
+
+sample = []
+sample_ = []
+plt.scatter(axis_x, data, label="Data")
+#a = lin_LSE(axis_x, data_, 1)
+#a = LSM_exp(data, 30)
+for i in range(1 , len(axis_x)):
+    sample_.append(LSM_exp(data[0:i], 30))
+sample_.append(LSM_exp(data, 30))
+plt.scatter(axis_x_2, sample_, label = "fweczshg")
+#print(a)
+#for i in range(len(axis_x)):
+#    sample.append(a[1] * math.e**(a[0] * axis_x[i]) + a[2])
+#plt.plot(axis_x, sample, label = "Fit")
 plt.legend()
 plt.show() 
-'''
+
+#LSM hyperbola
+
+def lin_LSE_h(x, y, coef):
+    x_h = []
+    for i in range(len(x)):
+        x_h.append(1/(x[i] + coef))
+    sum_x = 0
+    sum_x2 = 0
+    sum_y = 0
+    sum_xy = 0
+    for i in range(len(x_h)):
+        sum_x += x_h[i]
+        sum_x2 += x_h[i]**2
+        sum_y += y[i]
+        sum_xy += x_h[i] * y[i]
+    det = sum_x2 * len(x_h) - sum_x * sum_x
+    det_1 =  -1 * (sum_x * sum_y - sum_xy * len(x_h))
+    det_2 = sum_x2 * sum_y - sum_xy * sum_x
+    return [det_1/det, det_2/det]
+
+
+def G(a, b, c, x, y):
+    res = 0
+    for i in range(len(x)):
+        res += (a/(x[i] + b) + c - y[i])**2
+    return res
+
+def trenar_search_hprbl(f, x, y, x_L, x_R):
+    eps = 1e-6
+    left_ = x_L
+    right_ = x_R
+    while right_ > left_+eps:
+        t = (right_ - left_)/3
+        a = left_ + t
+        b = right_ - t
+        a_coefs = lin_LSE_h(x, y, a)
+        b_coefs = lin_LSE_h(x, y, b)
+        if f(a_coefs[0], a, a_coefs[1], x, y) < f(b_coefs[0], b, b_coefs[1], x, y):
+            right_ = b
+        else:
+            left_ = a
+    fin_k, fin_c = lin_LSE_h(x, y, (left_+right_)/2) 
+    return [(left_+right_)/2, fin_k, fin_c]
+    
+def LSM_hprbl(time_series, window):
+    if window > len(time_series):
+        window = len(time_series)    
+    time_series = time_series[-1*window:]
+    x = []
+    for i in range(len(time_series)):
+        x.append(i+1)
+    #x = np.arange(1, len(time_series)+1, 1)
+    fin_coefs = trenar_search_hprbl(G, x, time_series, -10, 10)
+    #return fin_coefs[1] * (math.e**(fin_coefs[0] * (x[-1]+1))) + fin_coefs[2]
+    return fin_coefs
     
 
-
-data_ = [1, 0.46153846153846156, 0.2413073884407883, 0.10770967367013787, 0.07700750592137354, 0.05094869585348801, 0.03649031598765177, 0.03305359048477479, 0.06817662151845572, 0.023501736923423982, 0.04493310985928079, 0.042189709937925673, 0.020371837617953647, 0.023918397709030238, 0.028416117428578636, 0.016137991859223867, 0.021189357351962045, 0.01569411116843049, 0.01220096278892372, 0.013755405534419927, 0.010860387690834406, 0.020114855373696915, 0.010125973612102485, 0.01151475415192085, 0.018721230522486632, 0.02291392071377881, 0.007359811323309845, 0.006655482039178563, 0.0054911625657606145, 0.008595925853987073]
 sample = []
-plt.scatter(axis_x, data_, label="Data")
+plt.scatter(axis_x, data, label="Data")
 #a = lin_LSE(axis_x, data_, 1)
-a = LSM_exp(data_, 30)
+a = LSM_hprbl(data, 30)
 print(a)
 for i in range(len(axis_x)):
-    sample.append(a[1] * math.e**(a[0] * axis_x[i]) + a[2])
+    sample.append(a[1] * (1/(axis_x[i] + a[0])) + a[2])
 plt.plot(axis_x, sample, label = "Fit")
 plt.legend()
 plt.show() 
